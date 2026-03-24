@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anonymous Bot - Live</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="logo-text">ANONYMOUS</div>
+        <div id="status" class="status-bar">SINCRONIZANDO DADOS...</div>
+        <div class="signal-box" id="signal">AGUARDANDO PADRÃO...</div>
+        <div class="confidence" id="confidence">Confiança: 0%</div>
+        <div style="font-size: 0.8rem; color: #888;">HISTÓRICO RECENTE:</div>
+        <div class="history-dots" id="history"></div>
+        <p style="margin-top: 20px; font-size: 0.7rem;">Sinal baseado em análise de tendência real.</p>
+    </div>
+    <script src="{{ url_for('static', filename='ai.js') }}"></script>
+</body>
+</html>
