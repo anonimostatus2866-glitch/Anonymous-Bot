@@ -4,96 +4,84 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
 
-USER_EB, PASS_EB = "922891255", "Amorosa012"
-
+# Memória do Bot
 bot_brain = {
     "history": [],
-    "prediction": "INICIALIZANDO...",
+    "prediction": "CALIBRANDO...",
     "confidence": 0,
-    "last_status": "SINCRONIZANDO...",
-    "current_target": None,
-    "error_log": None
+    "last_status": "SINCRONIZANDO",
+    "current_target": None
 }
 
 def monitor_bacbo_real():
     global bot_brain
     options = Options()
-    options.add_argument("--headless")
+    options.add_argument("--headless=new") # Modo novo mais estável
     options.add_argument("--no-sandbox")
-    options.add_argument("--disable-gpu")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1280,720")
-    options.add_argument("user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+    options.add_argument("--disable-blink-features=AutomationControlled") # Esconde que é BOT
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
     options.binary_location = "/usr/bin/google-chrome"
     
     driver = webdriver.Chrome(service=Service("/usr/local/bin/chromedriver"), options=options)
     
     try:
+        # Acessa diretamente o lobby para evitar redirecionamentos
         driver.get("https://www.elephantbet.co.ao/pt/casino/game-view/420032042/bac-bo-ao-vivo")
-        wait = WebDriverWait(driver, 45)
+        time.sleep(20) # Tempo para carregar scripts da Evolution
 
-        # Tentativa de Login Bypass
-        try:
-            logger.info("Localizando campos de login...")
-            u_field = wait.until(EC.presence_of_element_located((By.NAME, "username")))
-            p_field = driver.find_element(By.NAME, "password")
-            u_field.send_keys(USER_EB)
-            p_field.send_keys(PASS_EB)
-            driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-            time.sleep(10)
-        except:
-            logger.info("Login já realizado ou campos não encontrados.")
-
-        # Forçar entrada no Iframe da Evolution
-        iframe = wait.until(EC.presence_of_element_located((By.TAG_NAME, "iframe")))
-        driver.switch_to.frame(iframe)
-        logger.info("Sucesso: Dentro da mesa.")
-        bot_brain["last_status"] = "CONECTADO ✅"
-
-        last_count = 0
         while True:
-            # Seletores redundantes para as bolinhas (beads)
-            beads = driver.find_elements(By.CSS_SELECTOR, "[class*='bead-'], [class*='stats-bead'], .bead-text")
-            
-            if beads and len(beads) != last_count:
-                last_count = len(beads)
-                results = []
-                for b in beads[-12:]:
-                    c = b.get_attribute("class").lower()
-                    if "player" in c or "blue" in c: results.append("P")
-                    elif "banker" in c or "red" in c: results.append("B")
-                    elif "tie" in c or "gold" in c: results.append("T")
+            try:
+                # Tenta capturar os dados do histórico via JS direto no console
+                # Isso evita o erro de 'stacktrace' ao tentar clicar ou mudar de iframe
+                script = """
+                let results = [];
+                let beads = document.querySelectorAll("[class*='bead-'], [class*='stats-bead']");
+                beads.forEach(b => {
+                    let c = b.className.toLowerCase();
+                    if(c.includes('player')) results.push('P');
+                    else if(c.includes('banker')) results.append('B');
+                    else if(c.includes('tie')) results.push('T');
+                });
+                return results.slice(-12).reverse();
+                """
                 
-                results.reverse()
-                if results:
-                    current = results[0]
-                    # Validação de Win/Loss
-                    if bot_brain["current_target"]:
-                        bot_brain["last_status"] = "WIN ✅" if (current == bot_brain["current_target"] or current == "T") else "LOSS ❌"
-                    
-                    bot_brain["history"] = results
-                    # IA: Análise de alternância
-                    if results.count("P") > results.count("B"):
-                        bot_brain["prediction"], bot_brain["current_target"] = "ENTRAR NO VERMELHO", "B"
-                    else:
-                        bot_brain["prediction"], bot_brain["current_target"] = "ENTRAR NO AZUL", "P"
-                    bot_brain["confidence"] = 98
+                # Se estiver em Iframe, o Selenium tenta injetar em todos os frames
+                found_history = []
+                frames = driver.find_elements(By.TAG_NAME, "iframe")
+                for index, frame in enumerate(frames):
+                    try:
+                        driver.switch_to.frame(frame)
+                        found_history = driver.execute_script(script)
+                        if found_history: break
+                        driver.switch_to.default_content()
+                    except:
+                        driver.switch_to.default_content()
 
-            time.sleep(4)
+                if found_history:
+                    res = found_history[0]
+                    if bot_brain["current_target"]:
+                        bot_brain["last_status"] = "WIN ✅" if (res == bot_brain["current_target"] or res == 'T') else "LOSS ❌"
+                    
+                    bot_brain["history"] = found_history
+                    # Lógica de Inteligência: Anti-tendência
+                    bot_brain["current_target"] = 'B' if found_history.count('P') > found_history.count('B') else 'P'
+                    bot_brain["prediction"] = "ENTRAR NO " + ("VERMELHO" if bot_brain["current_target"] == 'B' else "AZUL")
+                    bot_brain["confidence"] = 98
+                
+            except Exception as e:
+                logging.error(f"Erro interno: {e}")
+            
+            time.sleep(5)
     except Exception as e:
-        bot_brain["error_log"] = str(e)
-        logger.error(f"Erro: {e}")
+        logging.error(f"Erro Fatal: {e}")
     finally:
         driver.quit()
-        time.sleep(15)
+        time.sleep(10)
         monitor_bacbo_real()
 
 threading.Thread(target=monitor_bacbo_real, daemon=True).start()
