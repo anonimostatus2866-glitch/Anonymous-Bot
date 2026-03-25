@@ -1,23 +1,27 @@
-async function updateBot() {
+async function updateUI() {
     try {
-        const res = await fetch('/api/signal');
-        const data = await res.json();
+        const response = await fetch('/api/signal');
+        const data = await response.json();
 
-        if (data.history.length > 0) {
-            document.getElementById("signal").innerText = data.prediction;
-            document.getElementById("confidence").innerText = `Confiança: ${data.confidence}%`;
-            
-            const signalEl = document.getElementById("signal");
-            if(data.prediction.includes("AZUL")) signalEl.style.color = "#007bff";
-            else if(data.prediction.includes("VERMELHO")) signalEl.style.color = "#ff4b4b";
+        const statusEl = document.getElementById("status");
+        const signalEl = document.getElementById("signal");
+        const histEl = document.getElementById("history");
 
-            const histEl = document.getElementById("history");
-            histEl.innerHTML = data.history.map(r => 
-                `<span class="dot ${r}">${r}</span>`
-            ).join("");
-            
-            document.getElementById("status").innerText = "SINALIZADOR ATIVO (PROTEJA TIE)";
-        }
-    } catch (e) { console.error("Erro na API"); }
+        // Exibe o resultado da última rodada (Win/Loss)
+        statusEl.innerText = data.last_status === "WAITING" ? "ANALISANDO PRÓXIMA RODADA..." : data.last_status;
+        statusEl.style.color = data.last_status.includes("WIN") ? "#00ff41" : "#ff4b4b";
+
+        // Exibe o sinal para a rodada ATUAL
+        signalEl.innerText = data.prediction;
+        signalEl.style.color = data.prediction.includes("AZUL") ? "#007bff" : "#ff4b4b";
+
+        document.getElementById("confidence").innerText = `Probabilidade: ${data.confidence}%`;
+
+        // Renderiza o histórico real da mesa
+        histEl.innerHTML = data.history.map(r => 
+            `<span class="dot ${r}">${r}</span>`
+        ).join("");
+
+    } catch (e) { console.error("Falha na sincronia."); }
 }
-setInterval(updateBot, 3000);
+setInterval(updateUI, 2000);
