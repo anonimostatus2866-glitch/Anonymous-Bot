@@ -1,27 +1,37 @@
-async function updateUI() {
+async function updateBot() {
     try {
         const response = await fetch('/api/signal');
         const data = await response.json();
 
         const statusEl = document.getElementById("status");
         const signalEl = document.getElementById("signal");
+        const confEl = document.getElementById("confidence");
         const histEl = document.getElementById("history");
 
-        // Exibe o resultado da última rodada (Win/Loss)
-        statusEl.innerText = data.last_status === "WAITING" ? "ANALISANDO PRÓXIMA RODADA..." : data.last_status;
-        statusEl.style.color = data.last_status.includes("WIN") ? "#00ff41" : "#ff4b4b";
+        // Atualiza Status de Win/Loss
+        if (data.last_status !== "WAITING") {
+            statusEl.innerText = data.last_status;
+            statusEl.className = data.last_status.includes("WIN") ? "status-bar win" : "status-bar loss";
+        }
 
-        // Exibe o sinal para a rodada ATUAL
+        // Atualiza o Sinal Atual
         signalEl.innerText = data.prediction;
-        signalEl.style.color = data.prediction.includes("AZUL") ? "#007bff" : "#ff4b4b";
+        if (data.prediction.includes("VERMELHO")) signalEl.style.color = "#ff4b4b";
+        else if (data.prediction.includes("AZUL")) signalEl.style.color = "#007bff";
 
-        document.getElementById("confidence").innerText = `Probabilidade: ${data.confidence}%`;
+        confEl.innerText = `Confiança: ${data.confidence}%`;
 
-        // Renderiza o histórico real da mesa
-        histEl.innerHTML = data.history.map(r => 
-            `<span class="dot ${r}">${r}</span>`
-        ).join("");
+        // Renderiza as bolinhas do histórico real
+        if (data.history.length > 0) {
+            histEl.innerHTML = data.history.map(r => 
+                `<span class="dot ${r}">${r}</span>`
+            ).join("");
+        }
 
-    } catch (e) { console.error("Falha na sincronia."); }
+    } catch (e) {
+        console.log("Aguardando conexão com o servidor...");
+    }
 }
-setInterval(updateUI, 2000);
+
+// Inicia o loop
+setInterval(updateBot, 2000);
